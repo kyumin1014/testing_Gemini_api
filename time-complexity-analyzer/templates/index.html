@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시간 복잡도 분석기</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>⏱ 시간 복잡도 분석기</h1>
+        <p class="subtitle">코드를 입력하면 Gemini AI가 시간 복잡도를 분석해드려요</p>
+
+        <div class="editor-section">
+            <label>코드 입력</label>
+            <textarea id="codeInput" placeholder="분석할 코드를 여기에 입력하세요..."></textarea>
+        </div>
+
+        <button id="analyzeBtn" onclick="analyzeCode()">분석하기</button>
+
+        <div class="result-section" id="resultSection" style="display:none;">
+            <label>분석 결과</label>
+            <div id="resultBox"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
