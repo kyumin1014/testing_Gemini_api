@@ -5,6 +5,8 @@ import os
 
 load_dotenv()
 
+
+
 app = Flask(__name__)
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -38,5 +40,5 @@ def analyze():
 
 if __name__ == "__main__":
     import webbrowser
-    webbrowser.open("http://127.0.0.1:5000")
-    app.run(debug=True)
+    webbrowser.open("http://127.0.0.1:5001")
+    app.run(debug=True, host="127.0.0.1", port=5001, use_reloader=False)
