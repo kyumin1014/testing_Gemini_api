@@ -1,16 +1,13 @@
 from flask import Flask, render_template, request, jsonify
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
-
-
 app = Flask(__name__)
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 @app.route("/")
 def index():
@@ -35,12 +32,13 @@ def analyze():
     {code}
     """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+    model="gemini-3.1-flash-lite-preview",
+    contents=prompt
+    )
     return jsonify({"result": response.text})
 
 if __name__ == "__main__":
     import webbrowser
     webbrowser.open("http://127.0.0.1:5001")
     app.run(debug=True, host="127.0.0.1", port=5001, use_reloader=False)
-
-    'testing1'
