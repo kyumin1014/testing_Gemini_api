@@ -9,11 +9,10 @@ function updateLineNumbers() {
 
     charCount.textContent = textarea.value.length;
 
-    // 스크롤 동기화
     lineNumbers.scrollTop = textarea.scrollTop;
 }
 
-// 초기 줄 번호
+// 스크롤 동기화
 document.getElementById("codeInput").addEventListener("scroll", function () {
     document.getElementById("lineNumbers").scrollTop = this.scrollTop;
 });
@@ -30,36 +29,52 @@ document.getElementById("codeInput").addEventListener("keydown", function (e) {
     }
 });
 
-// 코드 초기화
+// ─── Split mode ───────────────────────────────────────
+
+function setSplitMode(active) {
+    const workspace = document.getElementById("workspace");
+    const main = document.getElementById("mainContent");
+    if (active) {
+        workspace.classList.add("split");
+        main.classList.add("split-mode");
+    } else {
+        workspace.classList.remove("split");
+        main.classList.remove("split-mode");
+    }
+}
+
+// ─── 유틸 ─────────────────────────────────────────────
+
 function clearCode() {
     document.getElementById("codeInput").value = "";
     updateLineNumbers();
     hideResult();
+    setSplitMode(false);
 }
 
-// 코드 복사
 function copyCode() {
     const code = document.getElementById("codeInput").value;
     if (!code.trim()) return;
     navigator.clipboard.writeText(code).then(() => showToast("코드가 복사되었어요!"));
 }
 
-// 결과 복사
 function copyResult() {
-    const result = document.getElementById("resultBox").textContent;
+    const result = document.getElementById("resultBox").innerText;
     navigator.clipboard.writeText(result).then(() => showToast("결과가 복사되었어요!"));
 }
 
-// 다시 분석
 function resetAll() {
+    setSplitMode(false);
     hideResult();
-    document.getElementById("codeInput").focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => document.getElementById("codeInput").focus(), 300);
 }
 
-// 결과 숨기기
 function hideResult() {
     document.getElementById("resultContainer").style.display = "none";
     document.getElementById("loadingContainer").style.display = "none";
+    const astBadge = document.getElementById("astBadge");
+    if (astBadge) astBadge.remove();
 }
 
 // 토스트 메시지
@@ -117,9 +132,55 @@ function extractComplexity(text) {
     return null;
 }
 
-// 분석 실행
+// ─── 요약/상세 토글 ──────────────────────────────────
+
+let cachedSummaryHTML = "";
+let cachedDetailHTML = "";
+
+function renderContent(html, isDetail) {
+    const resultBox = document.getElementById("resultBox");
+    resultBox.classList.remove("content-animate");
+    void resultBox.offsetWidth; // reflow to restart animation
+    resultBox.classList.add("content-animate");
+
+    resultBox.innerHTML = html;
+
+    if (isDetail) {
+        // 상단에 "간단히 보기" 버튼
+        const topBtn = buildToggleBtn(false);
+        resultBox.prepend(topBtn);
+        // 하단에도 추가 (긴 내용 대비)
+        const bottomBtn = buildToggleBtn(false);
+        resultBox.appendChild(bottomBtn);
+    } else {
+        // 하단에 "자세히 보기" 버튼
+        const btn = buildToggleBtn(true);
+        resultBox.appendChild(btn);
+    }
+}
+
+function buildToggleBtn(toDetail) {
+    const btn = document.createElement("button");
+    btn.className = toDetail ? "detail-toggle-btn" : "detail-toggle-btn secondary";
+    btn.innerHTML = toDetail
+        ? `자세히 보기 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`
+        : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg> 간단히 보기`;
+    btn.onclick = () => {
+        if (toDetail) {
+            renderContent(cachedDetailHTML, true);
+        } else {
+            renderContent(cachedSummaryHTML, false);
+            document.getElementById("resultBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    };
+    return btn;
+}
+
+// ─── 분석 실행 ────────────────────────────────────────
+
 async function analyzeCode() {
     const code = document.getElementById("codeInput").value;
+    const lang = document.getElementById("langSelect").value;
     const btn = document.getElementById("analyzeBtn");
     const resultContainer = document.getElementById("resultContainer");
     const loadingContainer = document.getElementById("loadingContainer");
@@ -131,17 +192,18 @@ async function analyzeCode() {
         return;
     }
 
-    // 로딩 상태
+    // 즉시 split 모드로 전환 → 오른쪽 패널에 로딩 표시
     btn.disabled = true;
     resultContainer.style.display = "none";
     loadingContainer.style.display = "block";
-    loadingContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    setSplitMode(true);
 
     try {
         const response = await fetch("/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code })
+            body: JSON.stringify({ code, lang })
         });
 
         const data = await response.json();
@@ -149,14 +211,28 @@ async function analyzeCode() {
         loadingContainer.style.display = "none";
 
         if (data.error) {
-            resultBox.textContent = "⚠️ " + data.error;
-            complexityBadge.textContent = "";
+            resultBox.innerHTML = "<p>⚠️ " + data.error + "</p>";
             complexityBadge.style.display = "none";
         } else {
-            resultBox.textContent = data.result;
+            // 요약/상세 캐싱
+            cachedSummaryHTML = marked.parse(data.summary);
+            cachedDetailHTML = marked.parse(data.detail);
 
-            // Big-O 배지 추출
-            const complexity = extractComplexity(data.result);
+            // AST 배지 갱신
+            const existingBadge = document.getElementById("astBadge");
+            if (existingBadge) existingBadge.remove();
+            if (data.ast_summary) {
+                const astBadge = document.createElement("details");
+                astBadge.id = "astBadge";
+                astBadge.innerHTML = `<summary>🔬 정적 분석 요약 (AST)</summary><pre>${data.ast_summary}</pre>`;
+                resultBox.parentNode.insertBefore(astBadge, resultBox);
+            }
+
+            // 요약 먼저 표시
+            renderContent(cachedSummaryHTML, false);
+
+            // Big-O 배지 (요약 텍스트에서 추출)
+            const complexity = extractComplexity(data.summary);
             if (complexity) {
                 complexityBadge.textContent = complexity;
                 complexityBadge.style.display = "block";
@@ -166,11 +242,15 @@ async function analyzeCode() {
         }
 
         resultContainer.style.display = "block";
-        resultContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+        // 모바일: 결과 패널로 스크롤
+        if (window.innerWidth <= 900) {
+            resultContainer.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
 
     } catch (error) {
         loadingContainer.style.display = "none";
-        resultBox.textContent = "⚠️ 서버 오류가 발생했어요. 다시 시도해주세요.";
+        resultBox.innerHTML = "<p>⚠️ 서버 오류가 발생했어요. 다시 시도해주세요.</p>";
         complexityBadge.style.display = "none";
         resultContainer.style.display = "block";
     } finally {
