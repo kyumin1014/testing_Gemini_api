@@ -38,9 +38,9 @@
             <span class="logo-text">Complexity<span class="logo-accent">AI</span></span>
         </div>
         <nav class="nav-pills">
-            <span class="nav-pill active">분석기</span>
-            <span class="nav-pill">히스토리</span>
-            <span class="nav-pill">도움말</span>
+            <span class="nav-pill active" id="navAnalyzer" onclick="switchTab('analyzer')">분석기</span>
+            <span class="nav-pill" id="navHistory" onclick="switchTab('history')">히스토리</span>
+            <span class="nav-pill" id="navHelp" onclick="switchTab('help')">도움말</span>
         </nav>
     </header>
 
@@ -184,6 +184,75 @@
             </div>
         </div>
     </main>
+
+    <!-- 히스토리 섹션 -->
+    <section class="history-section" id="historySection" style="display:none">
+        <div class="history-header">
+            <h2 class="history-title">최근 분석 히스토리</h2>
+            <button class="icon-btn" onclick="loadHistory()" title="새로고침">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                </svg>
+            </button>
+        </div>
+        <div id="historyList" class="history-list">
+            <div class="history-empty">히스토리를 불러오는 중...</div>
+        </div>
+    </section>
+
+    <!-- 도움말 섹션 -->
+    <section class="history-section" id="helpSection" style="display:none">
+        <div class="history-header">
+            <h2 class="history-title">도움말</h2>
+        </div>
+        <div class="help-content">
+            <div class="help-card">
+                <h3>사용 방법</h3>
+                <ol>
+                    <li>분석할 코드를 왼쪽 에디터에 붙여넣으세요.</li>
+                    <li>언어를 선택하세요 (Python, Java, JavaScript, C++, C).</li>
+                    <li><strong>분석하기</strong> 버튼을 클릭하면 Gemini AI가 시간/공간 복잡도를 분석합니다.</li>
+                    <li>요약 결과에서 <strong>자세히 보기</strong>를 눌러 상세 분석을 확인하세요.</li>
+                </ol>
+            </div>
+            <div class="help-card">
+                <h3>히스토리 기능</h3>
+                <p>Firebase Firestore에 분석 결과가 자동 저장됩니다. 히스토리 탭에서 이전 분석을 클릭하면 코드와 결과를 다시 불러올 수 있습니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Firebase JS SDK (modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCwtNnnnNhH2sj1mjXDTGQ3HbZCFB7vMJ0",
+            authDomain: "parker-project-57025.firebaseapp.com",
+            projectId: "parker-project-57025",
+            storageBucket: "parker-project-57025.firebasestorage.app",
+            messagingSenderId: "552643448286",
+            appId: "1:552643448286:web:22001ce382d27cd9dbe14f",
+            measurementId: "G-0XEHCH3HFF"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app, "testing");
+        getAnalytics(app);
+
+        // script.js에서 사용할 수 있도록 전역 노출
+        window.db = db;
+        window.fsCollection = collection;
+        window.fsAddDoc = addDoc;
+        window.fsGetDocs = getDocs;
+        window.fsQuery = query;
+        window.fsOrderBy = orderBy;
+        window.fsLimit = limit;
+        window.fsServerTimestamp = serverTimestamp;
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>

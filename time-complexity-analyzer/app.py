@@ -223,3 +223,9 @@ if __name__ == "__main__":
     import webbrowser
     webbrowser.open("http://127.0.0.1:5001")
     app.run(debug=True, host="127.0.0.1", port=5001, use_reloader=False)
+else:
+    # 배포 환경 (gunicorn)
+    import logging
+    gunicorn_logger = logging.getLogger("gunicorn.error")
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)

@@ -1,3 +1,109 @@
+// ─── 탭 전환 ──────────────────────────────────────────
+
+function switchTab(tab) {
+    const navIds = { analyzer: 'navAnalyzer', history: 'navHistory', help: 'navHelp' };
+    Object.values(navIds).forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById(navIds[tab]).classList.add('active');
+
+    document.getElementById('mainContent').style.display = tab === 'analyzer' ? '' : 'none';
+    document.getElementById('historySection').style.display = tab === 'history' ? '' : 'none';
+    document.getElementById('helpSection').style.display = tab === 'help' ? '' : 'none';
+
+    if (tab === 'history') loadHistory();
+}
+
+// ─── 히스토리 ─────────────────────────────────────────
+
+const LANG_DISPLAY = {
+    python: 'Python', java: 'Java', javascript: 'JavaScript', cpp: 'C++', c: 'C'
+};
+
+async function loadHistory() {
+    const listEl = document.getElementById('historyList');
+    listEl.innerHTML = '<div class="history-empty">불러오는 중...</div>';
+    if (!window.db) {
+        listEl.innerHTML = '<div class="history-empty">⚠️ Firebase가 아직 초기화되지 않았어요. 잠시 후 다시 시도해주세요.</div>';
+        return;
+    }
+    try {
+        const q = fsQuery(
+            fsCollection(window.db, 'analyses'),
+            fsOrderBy('timestamp', 'desc'),
+            fsLimit(20)
+        );
+        const snapshot = await fsGetDocs(q);
+        const items = snapshot.docs.map(doc => {
+            const d = doc.data();
+            return {
+                id: doc.id,
+                language: d.language || 'python',
+                code: d.code || '',
+                code_preview: (d.code || '').substring(0, 120),
+                summary: d.summary || '',
+                detail: d.detail || '',
+                timestamp: d.timestamp ? d.timestamp.toDate().toISOString() : null
+            };
+        });
+        renderHistory(items);
+    } catch (e) {
+        listEl.innerHTML = `<div class="history-empty">⚠️ 히스토리를 불러오지 못했어요.<br><small>${e.message}</small></div>`;
+    }
+}
+
+function renderHistory(items) {
+    const listEl = document.getElementById('historyList');
+    if (!items || items.length === 0) {
+        listEl.innerHTML = '<div class="history-empty">아직 분석 기록이 없어요.<br>코드를 분석하면 여기에 저장됩니다.</div>';
+        return;
+    }
+    listEl.innerHTML = '';
+    items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'history-card';
+        const ts = item.timestamp ? new Date(item.timestamp).toLocaleString('ko-KR') : '시간 미상';
+        const langLabel = LANG_DISPLAY[item.language] || item.language;
+        const preview = item.code_preview ? item.code_preview.replace(/</g, '&lt;') + (item.code.length > 120 ? '…' : '') : '';
+        card.innerHTML = `
+            <div class="history-card-meta">
+                <span class="history-lang-badge">${langLabel}</span>
+                <span class="history-ts">${ts}</span>
+            </div>
+            <pre class="history-code-preview">${preview}</pre>
+            <div class="history-summary">${item.summary ? item.summary.substring(0, 200) : ''}</div>
+        `;
+        card.onclick = () => loadFromHistory(item);
+        listEl.appendChild(card);
+    });
+}
+
+function loadFromHistory(item) {
+    switchTab('analyzer');
+    document.getElementById('codeInput').value = item.code;
+    document.getElementById('langSelect').value = item.language;
+    updateLineNumbers();
+
+    cachedSummaryHTML = marked.parse(item.summary || '');
+    cachedDetailHTML = marked.parse(item.detail || '');
+
+    const loadingContainer = document.getElementById('loadingContainer');
+    const resultContainer = document.getElementById('resultContainer');
+    const complexityBadge = document.getElementById('complexityBadge');
+
+    loadingContainer.style.display = 'none';
+    setSplitMode(true);
+    renderContent(cachedSummaryHTML, false);
+
+    const complexity = extractComplexity(item.summary || '');
+    if (complexity) {
+        complexityBadge.textContent = complexity;
+        complexityBadge.style.display = 'block';
+    } else {
+        complexityBadge.style.display = 'none';
+    }
+    resultContainer.style.display = 'block';
+    showToast('히스토리에서 불러왔어요!');
+}
+
 // 줄 번호 업데이트
 function updateLineNumbers() {
     const textarea = document.getElementById("codeInput");
@@ -217,6 +323,17 @@ async function analyzeCode() {
             // 요약/상세 캐싱
             cachedSummaryHTML = marked.parse(data.summary);
             cachedDetailHTML = marked.parse(data.detail);
+
+            // Firestore에 결과 저장
+            if (window.db) {
+                fsAddDoc(fsCollection(window.db, 'analyses'), {
+                    code,
+                    language: lang,
+                    summary: data.summary,
+                    detail: data.detail,
+                    timestamp: fsServerTimestamp()
+                }).catch(e => console.warn('Firestore 저장 실패:', e));
+            }
 
             // AST 배지 갱신
             const existingBadge = document.getElementById("astBadge");
