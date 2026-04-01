@@ -244,11 +244,10 @@
         const db = getFirestore(app, "testing");
         getAnalytics(app);
 
-        // Gemini 클라이언트
-        const genAI = new GoogleGenerativeAI("AIzaSyBKo6pkNhBj-zJfBIAkWzdsO5LngPOIBPI");
+        // Gemini 클라이언트 (배포 시 deploy.sh가 키를 주입)
+        const genAI = new GoogleGenerativeAI("__GEMINI_API_KEY__");
         const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-        // script.js에서 사용할 수 있도록 전역 노출
         window.db = db;
         window.geminiModel = geminiModel;
         window.fsCollection = collection;
